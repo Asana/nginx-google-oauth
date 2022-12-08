@@ -1,5 +1,5 @@
-# debian:stretch at 2018-06-23T21:35:00Z
-FROM debian@sha256:de3eac83cd481c04c5d6c7344cd7327625a1d8b2540e82a8231b5675cef0ae5f
+# debian:buster at 2022-12-07T16:00:00Z
+FROM debian@sha256:e6fb8b88b411285ac71590459aa8d0a376acc86a3d17adfe45e806f522c54cc3
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends nginx-extras lua-cjson git ca-certificates && \
