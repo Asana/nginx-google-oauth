@@ -1,4 +1,4 @@
--- Copyright 2015-2020 Cloudflare
+-- Copyright 2015-2016 CloudFlare
 -- Copyright 2014-2015 Aaron Westendorf
 
 local json = require("cjson")
@@ -58,17 +58,18 @@ local function handle_token_uris(email, token, expires)
   end
 end
 
-local function check_domain(email)
+local function check_domain(email, whitelist_failed)
   local oauth_domain = email:match("[^@]+@(.+)")
-  -- if domain is configured, check it, if it isn't, reject request because whitelist was already checked
-  if domain and (domain:len() ~= 0) then
+  -- if domain is configured, check it, if it isn't, permit request
+  if domain:len() ~= 0 then
     if not string.find(" " .. domain .. " ", " " .. oauth_domain .. " ", 1, true) then
-      ngx.log(ngx.ERR, email .. " is not on " .. domain .. " nor in the whitelist")
+      if whitelist_failed then
+        ngx.log(ngx.ERR, email .. " is not on " .. domain .. " nor in the whitelist")
+      else
+        ngx.log(ngx.ERR, email .. " is not on " .. domain)
+      end
       return ngx.exit(ngx.HTTP_FORBIDDEN)
     end
-  else
-    ngx.log(ngx.ERR, email .. " is not in the whitelist and no domain is specified")
-    return ngx.exit(ngx.HTTP_FORBIDDEN)
   end
 end
 
@@ -82,14 +83,15 @@ local function on_auth(email, token, expires)
   end
 
   if whitelist then
-    -- if whitelisted, no need to check if it's a valid domain
+    -- if whitelisted, no need check the if it's a valid domain
     if not string.find(" " .. whitelist .. " ", " " .. email .. " ", 1, true) then
-      check_domain(email)
+      check_domain(email, true)
     end
   else
     -- empty whitelist, lets check if it's a valid domain
-    check_domain(email)
+    check_domain(email, false)
   end
+
 
   if set_user then
     if email_as_user then
@@ -218,7 +220,7 @@ local function authorize()
   end
 
   local expires      = ngx.time() + token["expires_in"]
-  local cookie_tail  = ";version=1;path=/;Max-Age=" .. extra_validity + token["expires_in"]
+  local cookie_tail  = ";version=1;path=/;Max-Age=" .. expires
   if secure_cookies then
     cookie_tail = cookie_tail .. ";secure"
   end
@@ -251,9 +253,4 @@ handle_signout()
 
 if not is_authorized() then
   authorize()
-end
-
--- if already authenticated, but still receives a /_oauth request, redirect to the correct destination
-if uri == "/_oauth" then
-  return ngx.redirect(uri_args["state"])
 end
